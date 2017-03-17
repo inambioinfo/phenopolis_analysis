@@ -2,7 +2,7 @@
 
 
 ```python
- python gene.py > gene_stats.txt
+ python gene_analysis.py > gene_stats.txt
 ```
 
 Open R:
