@@ -41,7 +41,7 @@ IC_max = IC(1,total)
 
 # getting serious now!
 result = defaultdict(float)
-ancestor_cache={}
+#ancestor_cache={}
 method_cache = {}
 mode = 'unrelated'
 n=0
@@ -61,11 +61,11 @@ for k,v in snapshot.items():
         result[key] = result.get(key, method_cache[h])
     # check each combination of the hpos if they are not in a line
     for h in itertools.combinations(hpos,2):
-        ancestor_cache[h[0]] = ancestor_cache.get(h[0], [i['id'] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],h[0])])
-        ancestor_cache[h[1]] = ancestor_cache.get(h[1], [i['id'] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],h[1])])
-        A = h[0] not in ancestor_cache[h[1]]
-        B = h[1] not in ancestor_cache[h[0]]
-        if A and B:
+        #ancestor_cache[h[0]] = ancestor_cache.get(h[0], [i['id'][0] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],h[0])])
+        #ancestor_cache[h[1]] = ancestor_cache.get(h[1], [i['id'][0] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],h[1])])
+        #A = h[0] not in ancestor_cache[h[1]]
+        #B = h[1] not in ancestor_cache[h[0]]
+        #if A and B:
             #key = tuple(sorted([h[0],h[1]]))
             key = '-'.join(sorted([h[0],h[1]]))
             # using normaliser conveniently make the result consistently smaller than if h0 is a subclass of h1 if later using IC(h0)*IC(h1)/max_IC**2 for getting weights.
