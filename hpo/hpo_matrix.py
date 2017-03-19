@@ -72,5 +72,5 @@ for k,v in snapshot.items():
             normaliser = 2*min(len(hpo_freq[mode][h[0]]),len(hpo_freq[mode][h[1]]))
             result[key] += (method_cache[h[0]] + method_cache[h[1]]) / normaliser
 
-with open('../data/hpo_matrix.json','w') as outf:
+with open(phenopolis_utils.OFFLINE_CONFIG['hpo']['matrix_file'],'w') as outf:
     json.dump(result,outf)
