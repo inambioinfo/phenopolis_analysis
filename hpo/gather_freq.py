@@ -14,8 +14,8 @@ from collections import defaultdict
 get input folder
 '''
 def get_folder():
-    folder = phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_folder']
-    folder = os.path.join('..',folder,'freq')
+    folder = phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_freq_folder']
+    folder = os.path.join('..',folder)
     return folder
 
 '''
