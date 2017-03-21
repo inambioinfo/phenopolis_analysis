@@ -28,6 +28,9 @@ def group(folder):
         data = hpo_helper.get_json(f)
         for k,v in data.items():
             result[k].append(v)
+    # sort data
+    for k,v in result.items():
+        v.sort()
     return result
 
 '''
