@@ -50,3 +50,9 @@ def get_hpo_freq(data):
         for h in d['hpo']:
             hpo_freq[h] += 1
     return hpo_freq
+
+'''
+ancient wrapper
+'''
+def get_ancients(id):
+    return [i['id'][0] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],id)]
