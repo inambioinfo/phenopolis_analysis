@@ -15,7 +15,7 @@ import hpo_helper
 return the output file
 '''
 def get_outfile(input):
-    outfolder = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_folder'], 'freq')
+    outfolder = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_freq_folder'])
     # mkdir -p output folder
     phenopolis_utils.mkdir_p(outfolder)
     # get input file number

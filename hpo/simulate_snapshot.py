@@ -105,7 +105,7 @@ if __name__ == '__main__':
     singletons = get_singletons(data)
     hpo_pool = get_hpo_pool(data,singletons,singleton_cutoff)
     s_count = phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_count']
-    outfolder = phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_folder']
+    outfolder = phenopolis_utils.OFFLINE_CONFIG['hpo']['simulation_snapshot_folder']
     # simulate
     for i in range(int(s_count)):
         print(i)
