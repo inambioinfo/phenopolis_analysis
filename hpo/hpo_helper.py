@@ -8,6 +8,7 @@ import phenopolis_utils
 import math
 from collections import defaultdict
 import json
+import os
 
 dbs = phenopolis_utils.get_mongo_collections()
 '''
@@ -54,5 +55,56 @@ def get_hpo_freq(data):
 '''
 ancient wrapper
 '''
-def get_ancients(id):
+def get_ancestors(id):
     return [i['id'][0] for i in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],id)]
+
+'''
+get nearest common ancestor
+'''
+def get_nearest_common_ancestor(h1,h2,freq):
+    hpos = list(set(get_ancestors(h1)) & set(get_ancestors(h2)))
+    fs = [freq[h] for h in hpos]
+    return hpos[fs.index(min(fs))]
+    
+'''
+parent
+'''
+def get_parents(id):
+    result = []
+    h=dbs['hpo_db'].hpo.find_one({'id':id})
+    return h.get('is_a',[])
+
+'''
+lin's similarity
+'''
+def lin_similarity(h1,h2,freq):
+    anc = get_nearest_common_ancestor(h1,h2,freq)
+    t = freq['HP:0000001']
+    return 2*IC(freq[anc],t)/( IC(freq[h1],t) + IC(freq[h2],t) )
+    
+'''
+weighted Lin's similarity
+'''
+def weighted_lin(h1,h2,real_matrix,sim_mean_matrix,freq):
+    k = '-'.join(sorted([h1,h2]))
+    real_weight = real_matrix.get(k,0)
+    sim_weight = sim_mean_matrix.get(k,0)
+    return real_weight * lin_similarity(h1,h2,freq)
+'''
+phenotype similarity between two sets of hpos
+method now only supports BM (best match)
+'''
+def patient_hpo_similarity(hpos1,hpos2,method,kernel):
+    # read matrix and freq
+    matrix_file = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['matrix_file'])
+    matrix = get_json(matrix_file)
+    # get keys and their values in the matrix
+    weights = {}
+    for h1 in hpos1:
+        for h2 in hpos2:
+            k = '-'.join(sorted([h1,h2]))
+            weights[k] = matri
+    # take two directions average
+    # hpos1 -> hpos2
+    for h1 in hpos1:
+        pass
