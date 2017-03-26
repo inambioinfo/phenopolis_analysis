@@ -65,8 +65,8 @@ if __name__ == '__main__':
             result[key] = result.get(key, method_cache[h])
         # check each combination of the hpos 
         for h in itertools.combinations(hpos,2):
-            #ancestor_cache[h[0]] = ancestor_cache.get(h[0], hpo_helper.get_ancients(h[0]))
-            #ancestor_cache[h[1]] = ancestor_cache.get(h[1], [i['id'][0] for i in hpo_helper.get_ancients([1]))
+            #ancestor_cache[h[0]] = ancestor_cache.get(h[0], hpo_helper.get_ancestors(h[0]))
+            #ancestor_cache[h[1]] = ancestor_cache.get(h[1], [i['id'][0] for i in hpo_helper.get_ancestors([1]))
             #A = h[0] not in ancestor_cache[h[1]]
             #B = h[1] not in ancestor_cache[h[0]]
             #if A and B:
@@ -76,5 +76,5 @@ if __name__ == '__main__':
                 normaliser = 2*min(len(hpo_freq[mode][h[0]]),len(hpo_freq[mode][h[1]]))
                 result[key] += (method_cache[h[0]] + method_cache[h[1]]) / normaliser
 
-    with open(phenopolis_utils.OFFLINE_CONFIG['hpo']['matrix_file'],'w') as outf:
+    with open(os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['matrix_file']),'w') as outf:
         json.dump(result,outf)
