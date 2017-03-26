@@ -1,11 +1,11 @@
 #!/bin/env python
 '''
 Use KING to get independent individuals
-/slms/gee/research/vyplab/UCLex/KING/KING/UCL-exome_unrelated.txt
 
 '''
 
 from optparse import OptionParser
+sys.path.append('../..')
 from lookups import *
 import pymongo
 import json
