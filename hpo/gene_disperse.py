@@ -10,6 +10,7 @@ import hpo_helper
 import os
 import json
 import numpy
+import pandas as pd
 from scipy import stats
 
 '''
@@ -32,6 +33,8 @@ def disperse(matrix,patients,g,mode):
         
 
     disperse = stats.ttest_ind([i['value'] for i in inn],[i['value'] for i in out],equal_var=False)
+    if pd.isnull(disperse[1]):
+        return None
     return disperse[1]/2
 
 if __name__ == '__main__':
@@ -51,5 +54,5 @@ if __name__ == '__main__':
             result['-'.join([fi,m])] = {}
             for g in genes:
                 result['-'.join([fi,m])][g] = disperse(matrix,patients,g,m)
-    outfile = '../data/public/hpo/candidate_test.json'
+    outfile = '../data/public/hpo/gene_disperse.json'
     hpo_helper.write_json(result,outfile)
