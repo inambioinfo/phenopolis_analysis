@@ -32,15 +32,13 @@ def slim(genes):
         for d in v['data']:
             if 'genes' in d: 
                 del d['genes']
-                d['hpo'] = [h['id'] for h in d['hpo'] if h['observed'] == 'yes']
+                d['hpo'] = phenopolis_utils.hpo_minimum_set(dbs['hpo_db'],[h['id'] for h in d['hpo'] if h['observed'] == 'yes'])
                 d['contact'] = d['contact']['user_id']
 
 '''
 fmt
 '''
 def fmt(genes):
-    # some patients might have strange stuff. remove them
-    bad_patients = ['Vulliamy_Sample_1623']
     result = {}
     for k,v in genes.items():
         for d in v['data']:
@@ -89,6 +87,13 @@ if __name__ == '__main__':
     genes = subset(genes,cutoff)
     # slim genes
     slim(genes)
+    # some patients are annotated badly. what happens if ...
+    # say ABCA4 patients all have 'autosomal recessive..' and 'macular dystrophy' ?
+    abca4fake = False
+    if abca4fake:
+        for g in genes['ENSG00000198691']['data']:
+            g['hpo'] = phenopolis_utils.hpo_minimum_set(dbs['hpo_db'],g['hpo'] + ['HP:0000007','HP:0007754'])
+
     # convert genes into patients
     patients = fmt(genes)
     # remove patients if they are not unrelated
@@ -103,11 +108,11 @@ if __name__ == '__main__':
     real_matrix_file = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['matrix_file'])
     real_matrix = hpo_helper.get_json(real_matrix_file)
     
-    matrix = patient_hpo_matrix.patient_hpo_matrix(dbs,patients,freq,real_matrix,patient_hpo_matrix.lin_similarity,mode='average',mx=True)
+    matrix = patient_hpo_matrix.patient_hpo_matrix(dbs,patients,freq,real_matrix,patient_hpo_matrix.cooc_matrix,mode='average_cooc',mx=True)
     # convert keys
     for k in list(matrix.keys()):
         newk = ','.join(k)
         matrix[newk] = matrix.pop(k)
     
-    f = '../data/private/hpo/patient_hpo_matrix_lin_MA.json'
+    f = '../data/private/hpo/patient_hpo_matrix_cooc_MA.json'
     hpo_helper.write_json(matrix,f)
