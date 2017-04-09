@@ -25,6 +25,28 @@ def get_json(input):
         return json.load(inf)
 
 '''
+get snapshot
+'''
+def read_snapshot(mini=True, unrelated=True):
+    if mini:
+        f = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['mini_snapshot_file'])
+    else:
+        f = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['snapshot_file'])
+    result = {}
+    with open(f,'r') as inf:
+        for row in inf:
+            if row[0] == '#': continue
+            row = row.rstrip().split('\t')
+            mode = int(row[1])
+            if unrelated and not mode: continue
+            hpos = row[2].split(',')
+            result[row[0]] = {
+                    'unrelated':mode,
+                    'hpos':hpos,
+            }
+    return result
+
+'''
 get json data
 '''
 def write_json(data,outfile):
