@@ -55,7 +55,10 @@ def similarity(dbs,hpos1,hpos2,freq,matrix,kernel,mode='sum',mx=True):
             result2 += sum(this)
     
     # average?
-    if mode == 'average':
+    if mode == 'average_cooc':
+        result1 = result1 / max(len(hpos1),len(hpos2))
+        result2 = result2 / max(len(hpos1),len(hpos2))
+    elif mode == 'average_lin':
         result1 = result1 / len(hpos1)
         result2 = result2 / len(hpos2)
     return (result1 + result2) / 2
@@ -73,7 +76,11 @@ def cooc_matrix(params):
     k = '-'.join(sorted([params['h1'],params['h2']]))
     return params['matrix'].get(k,0)
 
-
+'''
+marry lin and cooc together
+'''
+def marry(params):
+    return lin_similarity(params) * cooc_matrix(params)
 '''
 produce a matrix for patients
 mode = ['sum','average']
@@ -98,15 +105,14 @@ if __name__ == '__main__':
     test = {
             'brain_p1': snapshot['Vulliamy_April2014_Sample_3482'],
             'brain_p2': snapshot['Vulliamy_April2014_Sample_3615'],
-            'brain_p3': snapshot['Vulliamy_April2014_Sample_781'],
             'myopa_p1': snapshot['WebsterURMD_Sample_05G06386'],
             'myopa_p2': snapshot['WebsterURMD_Sample_05G03129'],
             'ush_p1': snapshot['IRDC_batch5_OXF_3023'],
             'ush_p2': snapshot['IRDC_batch3_MAN_1020_10003846'],
-            'ush_p3': snapshot['IRDC_batch9_OXF_3039'],
     }
-    h1 = ['HP:0000510','HP:0000007','HP:0000545','HP:0000662','HP:0007994','HP:0000662']
-    h2 = ['HP:0000510','HP:0000545','HP:0000662','HP:0001123','HP:0000518']
+    h1 = ['HP:0000365','HP:0010978']
+    h2 = ['HP:0000365','HP:0010978']
     # cooc
-    matrix = patient_hpo_matrix(dbs,test,freq,real_matrix,cooc_matrix,mode='average')
-    f = '../data/private'
+    #matrix = patient_hpo_matrix(dbs,test,freq,real_matrix,cooc_matrix,mode='average')
+    sim = similarity(dbs,h1,h2,freq,real_matrix,cooc_matrix,mode='average',mx=True)
+    print(sim)

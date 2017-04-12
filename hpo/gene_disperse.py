@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # get matrix file
     inpath = '../data/private/hpo'
-    fs = {'cooc':'patient_hpo_matrix_cooc_MA_minhpo.json','lin':'patient_hpo_matrix_lin_MA_minhpo.json'}
+    fs = {'cooc':'patient_hpo_matrix_cooc_MA.json','lin':'patient_hpo_matrix_lin_MA.json'}
     modes = ['zoom_in','zoom_out']
     patients = hpo_helper.get_json('../data/private/hpo/patient_info.json')
     genes = set([v['symbol'] for p,v in patients.items()])
