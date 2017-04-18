@@ -73,6 +73,11 @@ def IC_maker(t):
 check if two hpos are in line
 '''
 def beta(h_1, **kwargs):
+    # in buffer?
+    if kwargs['sym']:
+        k = tuple(sorted([h_1['index'],kwargs['h2']]))
+        if k in kwargs['buffer']:
+            return kwargs['buffer'][k]
     ic1 = h_1[0]
     ic2 = kwargs['ic_df'][kwargs['h2']]
     freq1 = kwargs['freq'][h_1['index']]
@@ -81,6 +86,8 @@ def beta(h_1, **kwargs):
         result = 0.5 * (ic1 + ic2) / ( min(freq1,freq2) * kwargs['max_ic'] )
     else: 
         result = 0.5 * (ic1 + ic2) / ( freq1 * kwargs['max_ic'] )
+    if kwargs['sym']:
+        kwargs['buffer'][k] = result
     return result
 
 '''
