@@ -16,26 +16,13 @@ import numpy as np
 calculate gene-gene similarity
 '''
 def gene_similarity(g1,g2,matrix):
-    result1 = result2 = 0
-    # g1 --> g2
+    result = []
     for p1 in g1:
-        this = []
         for p2 in g2:
             k = ','.join(sorted([p1,p2]))
-            this.append(matrix[k])
-        result1 += np.mean(this)
+            result.append(matrix[k])
 
-    # g2 --> g1
-    for p2 in g2:
-        this = []
-        for p1 in g1:
-            k = ','.join(sorted([p1,p2]))
-            this.append(matrix[k])
-        result2 += np.mean(this)
-
-    result1 = result1/len(g1)
-    result2 = result2/len(g2)
-    return (result1 + result2) / 2
+    return np.mean(result)
 
 '''
 group patients into genes
@@ -62,6 +49,8 @@ if __name__ == '__main__':
     patients = hpo_helper.get_json('../data/private/hpo/patient_info.json')
     # group them into genes
     genes = group(patients)
+    print(gene_similarity(['IRDC_batch2_OXF_3006','IRDC_batch1_LDS_4001_001_543'],['IRDC_batch2_MAN_1007_11002952','Levine_Aug2014_IBDAJ_436','Vulliamy_April2014_Sample_2199'],patient_matrix))
+    sys.exit()
     matrix = gene_matrix(genes,patient_matrix)
     outfile = '../data/public/hpo/gene_matrix.json'
     hpo_helper.write_json(matrix,outfile)
