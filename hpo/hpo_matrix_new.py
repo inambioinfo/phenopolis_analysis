@@ -176,10 +176,6 @@ if __name__ == '__main__':
             'lin': lin,
             'resnik': resnik,
     }
-    methods = {
-            'lin': lin,
-            'resnik': resnik,
-    }
     store = pd.HDFStore('../data/public/hpo/store.h5')
     dfs = build_matrices(snapshot_file,dbs,methods)
     print('write to HDF5')
