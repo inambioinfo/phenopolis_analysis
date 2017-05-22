@@ -102,8 +102,16 @@ lin's similarity
 def lin_similarity(h1,h2,freq):
     anc = get_nearest_common_ancestor(h1,h2,freq)
     t = freq['HP:0000001']
-    return 2*IC(freq[anc],t)/( IC(freq[h1],t) + IC(freq[h2],t) )
+    return 2*IC(freq[anc],t)/(( IC(freq[h1],t) + IC(freq[h2],t) ) or 1)
     
+'''
+Resnik similarity
+'''
+def resnik_similarity(h1,h2,freq):
+    anc = get_nearest_common_ancestor(h1,h2,freq)
+    t = freq['HP:0000001']
+    return IC(freq[anc],t)
+
 '''
 weighted Lin's similarity
 '''
