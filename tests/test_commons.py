@@ -24,6 +24,12 @@ class utilsTestCase(unittest.TestCase):
         case = self.db['hpo_db'].hpo.find_one({'id':'HP:0000001'})
         self.assertEqual(case['name'][0],'All')
 
+    def test_symbols_to_ids(self):
+        symbols=['ABCA4','SCN1A','BLABLA','ENSG00000172534']
+        case = symbols_to_ids(symbols,self.db['phenopolis_db'])
+        expected = ['ENSG00000198691', 'ENSG00000144285', 'ENSG00000172534']
+        self.assertItemsEqual(case,expected)
+
     def test_get_chrom_genes(self):
         case = get_chrom_genes([1],self.db['phenopolis_db'])
         assert 'ENSG00000196944' in case
