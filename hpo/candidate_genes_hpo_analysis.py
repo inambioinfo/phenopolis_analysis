@@ -92,7 +92,7 @@ if __name__ == '__main__':
     abca4fake = False
     if abca4fake:
         for g in genes['ENSG00000198691']['data']:
-            g['hpo'] = phenopolis_utils.hpo_minimum_set(dbs['hpo_db'],g['hpo'] + ['HP:0000007','HP:0007754'])
+            g['hpo'] = phenopolis_utils.hpo_minimum_set(dbs['hpo_db'],g['hpo'] + ['HP:0000007'])
 
     # convert genes into patients
     patients = fmt(genes)

@@ -5,8 +5,6 @@ Use KING to get independent individuals
 '''
 
 from optparse import OptionParser
-sys.path.append('../..')
-from lookups import *
 import pymongo
 import json
 import math
@@ -15,6 +13,8 @@ import numpy as np
 import os
 import sys
 sys.path.append('../commons')
+sys.path.append('../..')
+from lookups import *
 from phenopolis_utils import *
 import time
 import rest

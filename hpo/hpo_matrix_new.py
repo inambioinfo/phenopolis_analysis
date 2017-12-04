@@ -34,10 +34,14 @@ def build_matrices(snapshot_file,dbs,methods):
     ic_df = freq.apply(IC)
     print('build co-oc matrix')
     df = df.T.dot(df)
+    print('find all ancestors')
+    ancestors = {}
+    for i in freq.index:
+        ancestors[i] = [j['id'][0] for j in phenopolis_utils.get_hpo_ancestors(dbs['hpo_db'],i)]
     print('build sim matrix')
     result_dfs = {}
     for k,v in methods.items():
-        result_dfs[k] = v(dbs,df,ic_df,freq)
+        result_dfs[k] = v(dbs,df,ic_df,freq,ancestors)
     return result_dfs
 '''
 get unique terms
@@ -70,56 +74,107 @@ def IC_maker(t):
     return IC_wrapper
 
 '''
-check if two hpos are in line
+
 '''
 def beta(h_1, **kwargs):
     # in buffer?
-    k = tuple(sorted([h_1['index'],kwargs['h2']]))
-    if k in kwargs['buffer']:
-        return kwargs['buffer'][k]
+    if kwargs['mode'] != 'asym':
+        k = tuple(sorted([h_1['index'],kwargs['h2']]))
+        if k in kwargs['buff']:
+            return kwargs['buff'][k]
     ic1 = h_1[0]
     ic2 = kwargs['ic_df'][kwargs['h2']]
     freq1 = kwargs['freq'][h_1['index']]
     freq2 = kwargs['freq'][kwargs['h2']]
-    if kwargs['sym']:
+    if kwargs['mode'] == 'sym':
         result = 0.5 * (ic1 + ic2) / ( min(freq1,freq2) * kwargs['max_ic'] )
-    else: 
+    elif kwargs['mode'] == 'asym': 
         result = 0.5 * (ic1 + ic2) / ( freq1 * kwargs['max_ic'] )
-    kwargs['buffer'][k] = result
+    elif kwargs['mode'] == 'lin':
+        result = 2 * (kwargs['ic_df'][nca(h_1['index'],kwargs['h2'],kwargs['freq'],kwargs['ancestors'])]) / ( (ic1 + ic2) or 1 )
+    elif kwargs['mode'] == 'resnik':
+        result = kwargs['ic_df'][nca(h_1['index'],kwargs['h2'],kwargs['freq'],kwargs['ancestors'])]
+    else:
+        msg = 'Do not recognise similarity method: ' + kwargs['mode']
+        raise ValueError(msg)
+    if kwargs['mode'] != 'asym':
+        kwargs['buff'][k] = result
     return result
 
 '''
 sym_WAM
 '''
-def sym_WAM(dbs,df,ic_df,freq):
+def sym_WAM(dbs,df,ic_df,freq,ancestors):
     print('build hpo_sym_WAM')
     weight_df = pd.DataFrame(index=ic_df.index)
     max_ic = hpo_helper.IC(1,freq['HP:0000001'])
-    buffer = {}
+    buff = {}
     for i,h in enumerate(ic_df.index):
-        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,max_ic=max_ic,h2=h,buffer=buffer,sym=True)
+        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,max_ic=max_ic,h2=h,buff=buff,mode='sym')
         weight_df[h] = this.values
     return(df.multiply(weight_df))
 
 '''
 asym_WAM
 '''
-def asym_WAM(dbs,df,ic_df,freq):
+def asym_WAM(dbs,df,ic_df,freq,ancestors):
     print('build hpo_asym_WAM')
     weight_df = pd.DataFrame(index=ic_df.index)
     max_ic = hpo_helper.IC(1,freq['HP:0000001'])
-    buffer = {}
+    buff = {}
     for i,h in enumerate(ic_df.index):
-        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,max_ic=max_ic,h2=h,buffer=buffer,sym=False)
+        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,max_ic=max_ic,h2=h,buff=buff,mode='asym')
         weight_df[h] = this.values
     return(df.multiply(weight_df))
-    
+   
+'''
+lin
+'''
+def lin(dbs,df,ic_df,freq,ancestors):
+    print('build lin')
+    result = pd.DataFrame(index=ic_df.index)
+    buff = {}
+    for i,h in enumerate(ic_df.index):
+        print(i)
+        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,h2=h,buff=buff,mode='lin',ancestors=ancestors)
+        result[h] = this.values
+    return result
+
+'''
+resnik
+'''
+def resnik(dbs,df,ic_df,freq,ancestors):
+    print('build resnik')
+    result = pd.DataFrame(index=ic_df.index)
+    buff = {}
+    for i,h in enumerate(ic_df.index):
+        print(i)
+        this = ic_df.reset_index().apply(beta,axis=1,dbs=dbs,ic_df=ic_df,freq=freq,h2=h,buff=buff,mode='resnik',ancestors=ancestors)
+        result[h] = this.values
+    return result
+
+'''
+get nearest common ancestor
+'''
+def nca(h1,h2,freq,ancestors):
+    ca = set(ancestors[h1]) & set(ancestors[h2])
+    m = c = None
+    for h in ca:
+        if not m or freq[h] < c:
+            c = freq[h]
+            m = h
+    return m
+'''
+main
+'''
 if __name__ == '__main__':
     snapshot_file = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['snapshot_file'])
     dbs = phenopolis_utils.get_mongo_collections()
     methods = {
             'hpo_sym_WAM': sym_WAM,
             'hpo_asym_WAM': asym_WAM,
+            'lin': lin,
+            'resnik': resnik,
     }
     store = pd.HDFStore('../data/public/hpo/store.h5')
     dfs = build_matrices(snapshot_file,dbs,methods)

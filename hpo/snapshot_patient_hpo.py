@@ -26,7 +26,7 @@ else:
     outfile = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['snapshot_file'])
     outf=open(outfile,'w')
 
-outf.write('#p_id   unrelated   HPO\n')
+outf.write('#p_id\tunrelated\tHPO\n')
 
 for p in dbs['patient_db'].patients.find({},{'features':1, 'external_id':1}):
     #p_id   unrelated   hpo
