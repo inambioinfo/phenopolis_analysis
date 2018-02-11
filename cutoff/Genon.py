@@ -1,4 +1,4 @@
-# helper functions for the notebook
+# Core Genon facility
 from __future__ import print_function, division
 import numpy as np
 import math
@@ -600,7 +600,7 @@ class Genon:
             logp_df[k[0]][k[1]] = -math.log10(pval or 1e-10)
         return logp_df
 
-    def trim_ns(ns,ps):
+    def trim_ns(self,ns,ps):
         '''
         trim ns to make sure there's no negative hpo overlaps positive ones
         '''
@@ -610,8 +610,8 @@ class Genon:
                 continue
             bad = 0
             for hp in ps:
-                A = hn in [i['id'][0] for i in helper.get_hpo_ancestors(self.hpo_db, hp)]
-                B = hp in [i['id'][0] for i in helper.get_hpo_ancestors(self.hpo_db, hn)]
+                A = hn in [i['id'][0] for i in utils.get_hpo_ancestors(self.hpo_db, hp)]
+                B = hp in [i['id'][0] for i in utils.get_hpo_ancestors(self.hpo_db, hn)]
                 if A or B:
                     bad = 1
                     break
@@ -650,7 +650,7 @@ class Genon:
         '''
         R = GenonResult()
         R.genes = self.genes
-        hpos = [i for i,v in self.phs.items() if v >= self.N]
+        hpos = [i for i,v in self.phs.items() if v >= self.N and i not in self.hpo_mask]
         for gene in self.genes:
             this_hpos = self.genes[gene].hpos or hpos
             for mode in ('r','d'):
@@ -676,13 +676,13 @@ class Genon:
 
             # are hpos provided? if not, predict
             if not self.genes[gene].hpos:
-                ps, ns = get_positive_negative_hpos(R.genon_sum[gene])
+                ps, ns = self.get_positive_negative_hpos(R.genon_sum[gene])
                 # remove ns
                 # note that ns is minised, so need to use ps to remove
                 # any unwanted hpos
                 for mode in ('d','r'):
                     for hpo in hpos:
-                        if hpo not in ps:
+                        if hpo not in ps[mode]:
                             R.genon_sum[gene][mode].pop(hpo, None)
                             R.genon_ratio[gene][mode].pop(hpo, None)
 
