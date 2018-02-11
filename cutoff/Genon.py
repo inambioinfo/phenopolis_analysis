@@ -313,11 +313,12 @@ class GenonResult:
             else:
                 s += '- HPOs are predicted...'
             s += '\n'
-            for hpo in self.genon_sum[gene][mode]:
+            for hpo,Sum in sorted(
+                    self.genon_sum[gene][mode].items(), 
+                    key = lambda x :x[1],
+                    reverse = True):
                 s += '\t{}\n'.format(hpo)
-                s += '\t\tGenon_sum: {}\n'.format(
-                        self.genon_sum[gene][mode][hpo]
-                        )
+                s += '\t\tGenon_sum: {}\n'.format(Sum)
                 s += '\t\tGenon_ratio: {}\n'.format(
                         self.genon_ratio[gene][mode][hpo]
                         )
