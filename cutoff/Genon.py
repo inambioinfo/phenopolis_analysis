@@ -372,7 +372,7 @@ class Genon:
         self.N = 100
         # the following hpos will not be analysed
         # they are inheritance modes that we do not know
-        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745',]
+        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005']
         # steps = (cadd step, gnomad step)
         self.steps = (5, 0.00025)
         # what is the gnomad range for analysis?
