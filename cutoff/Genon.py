@@ -84,6 +84,19 @@ class GeneBase:
             self._phase = phase
         return self._phase
 
+    @property
+    def patient_maps(self):
+        '''
+        get patient maps for both mode.
+        if you want to recalculate it somehow, reset self._patient_maps to None
+        '''
+        if getattr(self, '_patient_maps', None) is None:
+            self._patient_maps = dict(
+                    r = self.get_patient_map('r'),
+                    d = self.get_patient_map('d')
+                    )
+        return self._patient_maps
+
     def get_batch_artefacts(self, gp):
         # using binom, and gnomad_af as p, to produce probability to help identify batch specific artefacts
         # lower_bound is there to remove cohorts where there is just one patient
@@ -284,16 +297,27 @@ class GenonResult:
     def __init__(self):
         self.genon_sum = defaultdict(lambda: defaultdict(dict))
         self.genon_ratio = defaultdict(lambda: defaultdict(dict))
+        self.genon_combined = defaultdict(lambda: defaultdict(dict))
         self.genes = None
         self.predicted_mode = dict()
+
+        # for representing obj, sorting hpos
+        self.sort_key = 'genon_sum'
+
+        # number of patients with 'rare' variants under different modes
+        self.np = defaultdict(dict)
     def __str__(self):
         s = ''
-        for gene in self.genon_sum:
+        for gene in getattr(self,self.sort_key):
             s += gene
             # write mode
             if self.genes[gene].mode is not None:
                 mode = self.genes[gene].mode
                 s += ' - Given mode is {}\n'.format(mode)
+                s += ' ' * len(gene)
+                s += ' - Number of patients with rare variants: {}\n'.format(
+                        self.np[gene][mode]
+                        )
             else:
                 mode_digit = self.predicted_mode[gene]
                 if mode_digit > 0:
@@ -303,6 +327,10 @@ class GenonResult:
                 else:
                     mode = 'u'
                 s += ' - Predicted mode is {}\n'.format(mode)
+                s += ' ' * len(gene)
+                s += ' - Number of patients for mode d: {}\n'.format(self.np[gene]['d'])
+                s += ' ' * len(gene)
+                s += ' - Number of patietns for mode r: {}\n'.format(self.np[gene]['r'])
             # do not want to carry on with mode:u
             if mode == 'u':
                 continue
@@ -314,13 +342,16 @@ class GenonResult:
                 s += '- HPOs are predicted...'
             s += '\n'
             for hpo,Sum in sorted(
-                    self.genon_sum[gene][mode].items(), 
+                    getattr(self,self.sort_key)[gene][mode].items(), 
                     key = lambda x :x[1],
                     reverse = True):
                 s += '\t{}\n'.format(hpo)
                 s += '\t\tGenon_sum: {}\n'.format(Sum)
                 s += '\t\tGenon_ratio: {}\n'.format(
                         self.genon_ratio[gene][mode][hpo]
+                        )
+                s += '\t\tGenon_combined: {}\n'.format(
+                        self.genon_combined[gene][mode][hpo]
                         )
         return s
                 
@@ -373,7 +404,7 @@ class Genon:
         self.N = 100
         # the following hpos will not be analysed
         # they are inheritance modes that we do not know
-        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005']
+        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005','HP:0012823']
         # steps = (cadd step, gnomad step)
         self.steps = (5, 0.00025)
         # what is the gnomad range for analysis?
@@ -410,7 +441,7 @@ class Genon:
                     [
                         'HP:0007754',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         'HP:0000510',
@@ -429,7 +460,7 @@ class Genon:
                         'HP:0000510',
                         'HP:0000556',
                         'HP:0000365',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -438,7 +469,7 @@ class Genon:
                     [
                         'HP:0000548',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -450,7 +481,7 @@ class Genon:
                         'HP:0000548',
                         'HP:0000639',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -468,7 +499,7 @@ class Genon:
                     [
                         'HP:0007754',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -477,7 +508,7 @@ class Genon:
                     [
                         'HP:0000510',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -486,7 +517,7 @@ class Genon:
                     [
                         'HP:0000510',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -495,7 +526,7 @@ class Genon:
                     [
                         'HP:0000510',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -505,7 +536,7 @@ class Genon:
                         'HP:0000510',
                         'HP:0000518',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         ]
                     ),
@@ -513,7 +544,7 @@ class Genon:
                     [
                         'HP:0000510',
                         'HP:0000556',
-                        'HP:0000505',
+                        'HP:0000504',
                         'HP:0000512',
                         'HP:0000662',
                         ]
@@ -621,9 +652,10 @@ class Genon:
                 result.append(hn)
         return result
 
-    def get_positive_negative_hpos(self,genon_sums):
+    def get_positive_negative_hpos(self,genon_sums,genon_ratios,genon_combined):
         '''
-        get positive and negative hpo sets
+        Get positive and negative hpo sets.
+        Default method
         '''
         ps,ns = {'r':[],'d':[]},{'r':[],'d':[]}
 
@@ -643,61 +675,96 @@ class Genon:
             ns[mode] = self.trim_ns(ns[mode],ps[mode])
         return ps,ns
 
-    def analyse(self):
+    def predict_mode(self,gs,gr,gc):
+        '''
+        predict inheritance mode
+        return a number. 
+        Negative means dominant
+        Positive means recessive
+        '''
+        vals = {'r':0,'d':0}
+        for mode in ('r','d'):
+            vals[mode] += sum(gc[mode].values())
+        return vals['r'] - vals['d']
+
+    def analyse(self, R, patient_maps = None):
         '''
         Genon analyse
         if hpos for a gene is provided, treat the hpos as truely associated
         else, calculate Phenogenon for all hpos, both modes, and find out
         the associated hpos
+        # R is a global cached GenonResult
         '''
-        R = GenonResult()
-        R.genes = self.genes
+        rr = GenonResult()
+        rr.genes = self.genes
         hpos = [i for i,v in self.phs.items() if v >= self.N and i not in self.hpo_mask]
         for gene in self.genes:
             this_hpos = self.genes[gene].hpos or hpos
             for mode in ('r','d'):
-                # get patient map
-                patient_map = self.genes[gene].get_patient_map(mode)
+                # get patient map if it is not given
+                if patient_maps is None or gene not in patient_maps:
+                    patient_map = self.genes[gene].patient_maps[mode]
+                    if patient_maps is not None:
+                        patient_maps[gene] = self.genes[gene].patient_maps
+                else:
+                    patient_map = patient_maps[gene][mode]
+                if mode not in R.np[gene]:
+                    R.np[gene][mode] = len(set(list(itertools.chain.from_iterable(
+                        [v[0] for k,v in patient_map.items() if k[1] == 0]
+                        ))))
+                rr.np[gene][mode] = R.np[gene][mode]
                 for hpo in this_hpos:
-                    genon = self.phenogenon(
-                            self.genes[gene],
-                            patient_map,
-                            hpo
-                            )
-                    genon_sum = sum(genon[:,0])
-                    # silence the RuntimeWarning
-                    S = np.sum(genon)
-                    if S == 0:
-                        genon_ratio = 0
-                    else:
-                        genon_ratio = genon_sum / S
+                    if hpo not in R.genon_sum[gene][mode]:
+                        genon = self.phenogenon(
+                                self.genes[gene],
+                                patient_map,
+                                hpo
+                                )
+                        genon_sum = sum(genon[:,0])
+                        # silence the RuntimeWarning
+                        S = np.sum(genon)
+                        if S == 0:
+                            genon_ratio = 0
+                        else:
+                            genon_ratio = genon_sum / S
 
-                    # write to result
-                    R.genon_sum[gene][mode][hpo] = genon_sum
-                    R.genon_ratio[gene][mode][hpo] = genon_ratio
+                        # write to result
+                        R.genon_sum[gene][mode][hpo] = genon_sum
+                        R.genon_ratio[gene][mode][hpo] = genon_ratio
+                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_ratio
+
+                    for tp in ('genon_sum','genon_ratio','genon_combined'):
+                        getattr(rr,tp)[gene][mode][hpo] = \
+                                getattr(R,tp)[gene][mode][hpo]
 
             # are hpos provided? if not, predict
             if not self.genes[gene].hpos:
-                ps, ns = self.get_positive_negative_hpos(R.genon_sum[gene])
+                ps, ns = self.get_positive_negative_hpos(
+                        rr.genon_sum[gene],
+                        rr.genon_ratio[gene],
+                        rr.genon_combined[gene]
+                        )
                 # remove ns
                 # note that ns is minised, so need to use ps to remove
                 # any unwanted hpos
                 for mode in ('d','r'):
                     for hpo in hpos:
                         if hpo not in ps[mode]:
-                            R.genon_sum[gene][mode].pop(hpo, None)
-                            R.genon_ratio[gene][mode].pop(hpo, None)
+                            for tp in (
+                                    'genon_sum',
+                                    'genon_ratio',
+                                    'genon_combined'
+                                    ):
+                                getattr(rr,tp)[gene][mode].pop(hpo)
 
             # predict inheritance mode
-            gxg = {'r':0,'d':0}
-            for mode in ('r','d'):
-                for hpo in R.genon_sum[gene][mode]:
-                    gxg[mode] += R.genon_sum[gene][mode][hpo] * \
-                            R.genon_ratio[gene][mode][hpo]
+            rr.predicted_mode[gene] = self.predict_mode(
+                    rr.genon_sum[gene],
+                    rr.genon_ratio[gene],
+                    rr.genon_combined[gene]
+                    )
 
-            R.predicted_mode[gene] = gxg['r'] - gxg['d']
-
-        return R
+        return rr
 
 if __name__ == '__main__':
     G = Genon()
