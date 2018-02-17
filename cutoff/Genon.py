@@ -232,6 +232,8 @@ class GeneBase:
         matches the lower bounds for both gr and cr.
         '''
         mode_dict = {'r':'gnomad_hom_af','d':'gnomad_af'}
+        if self.use_af_for_recessive:
+            mode_dict['r'] = 'gnomad_af'
         narrow_vs = (k for k,v in vs.items() if gr[0]<=v[mode_dict[mode]]<gr[1] and cr[0]<=self.cadd[k]<cr[1])
         broad_vs = tuple()
         if mode == 'r':
@@ -330,7 +332,7 @@ class GenonResult:
                 s += ' ' * len(gene)
                 s += ' - Number of patients for mode d: {}\n'.format(self.np[gene]['d'])
                 s += ' ' * len(gene)
-                s += ' - Number of patietns for mode r: {}\n'.format(self.np[gene]['r'])
+                s += ' - Number of patients for mode r: {}\n'.format(self.np[gene]['r'])
             # do not want to carry on with mode:u
             if mode == 'u':
                 continue
@@ -396,7 +398,7 @@ class Genon:
         self.phase_cutoff = .75
         # for recessive, what is the min for the second variant's cadd
         #  when the first variant's cadd is high(er than {second_cadd_min})?
-        self.second_cadd_min = 15
+        self.second_cadd_min = 100
         # only analyse hpo with N >= {N}
         # if no phase data is available, one can set gap to 100,
         # to treat close-by variants as cis
@@ -409,15 +411,18 @@ class Genon:
         self.steps = (5, 0.00025)
         # what is the gnomad range for analysis?
         self.grange = (0, 0.01)
-        self.crange = (0, 60)
+        self.crange = (5, 60)
         # if hpos are not given, Genon will try to find out associated hpos
         self.coefficient = 1.
+        # what if we use af insteand of hom_f for recessive mode?
+        self.use_af_for_recessive = False
 
         # mongodb
         self.conn = pymongo.MongoClient()#(host = 'phenotips')
         self.hpo_db = self.conn['hpo']
         self.p_db = self.conn['patients']
 
+    def init_genes(self):
         # genes to analyse
         # subclass Gene with useful defaults
         Gene = partialclass(GeneBase, 
@@ -435,6 +440,7 @@ class Genon:
                 miss_cutoff = self.miss_cutoff,
                 patient_mini = self.patient_mini,
                 phase_cutoff = self.phase_cutoff,
+                use_af_for_recessive = self.use_af_for_recessive,
                 )
         self.genes = dict(
                 ABCA4 = Gene('ABCA4','r',
@@ -684,7 +690,7 @@ class Genon:
         '''
         vals = {'r':0,'d':0}
         for mode in ('r','d'):
-            vals[mode] += sum(gc[mode].values())
+            vals[mode] = np.mean(gc[mode].values())
         return vals['r'] - vals['d']
 
     def analyse(self, R, patient_maps = None):
