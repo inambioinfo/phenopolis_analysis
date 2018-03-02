@@ -298,8 +298,10 @@ class GenonResult:
     '''
     def __init__(self):
         self.genon_sum = defaultdict(lambda: defaultdict(dict))
-        self.genon_ratio = defaultdict(lambda: defaultdict(dict))
+        self.genon_hratio = defaultdict(lambda: defaultdict(dict))
+        self.genon_vratio = defaultdict(lambda: defaultdict(dict))
         self.genon_combined = defaultdict(lambda: defaultdict(dict))
+        self.genon_sratio = defaultdict(lambda: defaultdict(dict))
         self.genes = None
         self.predicted_mode = dict()
 
@@ -349,8 +351,14 @@ class GenonResult:
                     reverse = True):
                 s += '\t{}\n'.format(hpo)
                 s += '\t\tGenon_sum: {}\n'.format(Sum)
-                s += '\t\tGenon_ratio: {}\n'.format(
-                        self.genon_ratio[gene][mode][hpo]
+                s += '\t\tGenon_hratio: {}\n'.format(
+                        self.genon_hratio[gene][mode][hpo]
+                        )
+                s += '\t\tGenon_vratio: {}\n'.format(
+                        self.genon_vratio[gene][mode][hpo]
+                        )
+                s += '\t\tGenon_sratio: {}\n'.format(
+                        self.genon_sratio[gene][mode][hpo]
                         )
                 s += '\t\tGenon_combined: {}\n'.format(
                         self.genon_combined[gene][mode][hpo]
@@ -384,8 +392,6 @@ class Genon:
         # remove batch effect? if yes, set the binom_cutoff. 
         #  if no, leave it as None
         self.binom_cutoff = 1e-10
-        # log(0) is meaningless. replace 0 with {replace_zero}
-        self.replace_zero = 1e-6
         # If a cohort's size is lower than {lower_bound},
         # do not process the cohort for batch effect
         self.lower_bound = 2
@@ -399,6 +405,11 @@ class Genon:
         # for recessive, what is the min for the second variant's cadd
         #  when the first variant's cadd is high(er than {second_cadd_min})?
         self.second_cadd_min = 100
+        # how to combine p values. fisher or stouffer.
+        # stouffer can add weights
+        self.combine_pvalues_method = 'stouffer'
+        # stouffer's weight slope
+        self.stouffer_weight_slope = 0.5
         # only analyse hpo with N >= {N}
         # if no phase data is available, one can set gap to 100,
         # to treat close-by variants as cis
@@ -406,16 +417,18 @@ class Genon:
         self.N = 100
         # the following hpos will not be analysed
         # they are inheritance modes that we do not know
-        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005','HP:0012823']
+        self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005','HP:0012823','HP:0003674']
         # steps = (cadd step, gnomad step)
         self.steps = (5, 0.00025)
         # what is the gnomad range for analysis?
         self.grange = (0, 0.01)
-        self.crange = (5, 60)
+        self.crange = (0, 60)
         # if hpos are not given, Genon will try to find out associated hpos
         self.coefficient = 1.
         # what if we use af insteand of hom_f for recessive mode?
         self.use_af_for_recessive = False
+
+        self.damage_cadd = 15
 
         # mongodb
         self.conn = pymongo.MongoClient()#(host = 'phenotips')
@@ -433,7 +446,6 @@ class Genon:
                 steps = self.steps,
                 binom_cutoff = self.binom_cutoff,
                 lower_bound = self.lower_bound,
-                replace_zero = self.replace_zero,
                 second_cadd_min = self.second_cadd_min,
                 zero_gnomad_c_cutoff = self.zero_gnomad_c_cutoff,
                 gap = self.gap,
@@ -624,7 +636,7 @@ class Genon:
             p_h = len(raw_p_h - v[1])
             p_g = len(v[0])
             if not p_g:
-                logp_df[k[0]][k[1]] = 0
+                logp_df[k[0]][k[1]] = None
                 continue
             p_gh = 0
             for p in v[0]:
@@ -636,7 +648,7 @@ class Genon:
                     p_g - p_gh,
                     p_gh
                     ).right_tail
-            logp_df[k[0]][k[1]] = -math.log10(pval or 1e-10)
+            logp_df[k[0]][k[1]] = pval# or sys.float_info.epsilon
         return logp_df
 
     def trim_ns(self,ns,ps):
@@ -658,7 +670,7 @@ class Genon:
                 result.append(hn)
         return result
 
-    def get_positive_negative_hpos(self,genon_sums,genon_ratios,genon_combined):
+    def get_positive_negative_hpos(self,genon_sum,genon_hratio,genon_vratio,genon_sratio,genon_combined,):
         '''
         Get positive and negative hpo sets.
         Default method
@@ -667,10 +679,10 @@ class Genon:
 
         # get positive hpos and negative hpos
         for mode in ('r','d'):
-            cutf = np.mean(genon_sums[mode].values()) + \
+            cutf = np.mean(genon_sum[mode].values()) + \
                     self.coefficient * \
-                    np.std(genon_sums[mode].values())
-            for k,v in genon_sums[mode].items():
+                    np.std(genon_sum[mode].values())
+            for k,v in genon_sum[mode].items():
                 if v > cutf:
                     ps[mode].append(k)
                 elif v < cutf:
@@ -681,7 +693,7 @@ class Genon:
             ns[mode] = self.trim_ns(ns[mode],ps[mode])
         return ps,ns
 
-    def predict_mode(self,gs,gr,gc):
+    def predict_mode(self,gs,hr,vr,sr,gc):
         '''
         predict inheritance mode
         return a number. 
@@ -690,7 +702,7 @@ class Genon:
         '''
         vals = {'r':0,'d':0}
         for mode in ('r','d'):
-            vals[mode] = np.mean(gc[mode].values())
+            vals[mode] = max(gc[mode].values() or [0])
         return vals['r'] - vals['d']
 
     def analyse(self, R, patient_maps = None):
@@ -726,20 +738,108 @@ class Genon:
                                 patient_map,
                                 hpo
                                 )
-                        genon_sum = sum(genon[:,0])
-                        # silence the RuntimeWarning
-                        S = np.sum(genon)
-                        if S == 0:
-                            genon_ratio = 0
+                        # reward high cadd based on second_cadd_min
+                        # second_cadd_min already rewards recessive by *2
+                        # if both variants are above second_cadd_min
+                        # dominant * 1.5
+                        # this is not needed any longer
+                        if mode == 'd':
+                            cadd_ind = self.second_cadd_min // self.steps[0]
+                            genon[cadd_ind:,:] *= 1.5
+
+                        if self.combine_pvalues_method == 'stouffer':
+                            # convert all genon > 0.5 to 0.5 to stablise stouffer's
+                            # performance
+                            # not needed if using fisher
+                            genon[genon > 0.5] = 0.5
+
+                        # use stouffer or fisher method to combine p values, 
+                        # with weights for different cadd
+                        # weights only applicable to stouffer
+                        weights, pvals = [],[]
+                        for ind,val in enumerate(genon[:,0]):
+                            if not np.isnan(val):
+                                weights.append(
+                                        ind * self.stouffer_weight_slope + 0.5
+                                )
+                                pvals.append(val)
+                        if len(pvals):
+                            combine_test = stats.combine_pvalues(
+                                    pvalues = pvals,
+                                    method = self.combine_pvalues_method,
+                                    weights = weights
+                            )
+                            genon_sum =  -math.log(combine_test[1])
                         else:
-                            genon_ratio = genon_sum / S
+                            genon_sum = 0
+
+                        if not genon_sum:
+                            # genon_sum is 0. return everything as 0
+                            # write to result
+                            R.genon_sum[gene][mode][hpo] = 0
+                            R.genon_hratio[gene][mode][hpo] = 0
+                            R.genon_sratio[gene][mode][hpo] = 0
+                            R.genon_vratio[gene][mode][hpo] = 0
+                            R.genon_combined[gene][mode][hpo] = 0
+
+                            for tp in ('genon_sum','genon_sratio','genon_hratio','genon_vratio','genon_combined',):
+                                getattr(rr,tp)[gene][mode][hpo] = 0
+                            continue
+
+                        # how about contribution from all?
+                        weights, pvals = [],[]
+                        for ind,i in enumerate(genon):
+                            for j in i:
+                                if not np.isnan(j):
+                                    weights.append(
+                                            ind * self.stouffer_weight_slope + 0.5
+                                    )
+                                    pvals.append(j)
+                        stouffer = stats.combine_pvalues(
+                                pvalues = pvals,
+                                method = self.combine_pvalues_method,
+                                weights = weights
+                        )
+                        S = -math.log(stouffer[1])
+                        genon_hratio = genon_sum / (genon_sum + S)
+                        # signal ratio
+                        rare = genon[:,0][~np.isnan(genon[:,0])]
+                        numerator = len(rare[ rare < 1 ])
+                        al = genon[~np.isnan(genon)]
+
+                        denominator = len(al[al<1])
+                        genon_sratio = numerator / denominator
+
+                        # what proportion of contribution from damaging variants?
+                        # only calculate for rare variants
+                        ind = (self.damage_cadd - self.crange[0]) // self.steps[0]
+                        damage_arr = genon[ind:,0]
+                        weights,pvals = [],[]
+                        for ind,val in enumerate(damage_arr):
+                            if not np.isnan(val):
+                                weights.append(
+                                        ind * self.stouffer_weight_slope + 0.5
+                                )
+                                pvals.append(val)
+                        stouffer = stats.combine_pvalues(
+                                pvalues = pvals,
+                                method = self.combine_pvalues_method,
+                                weights = weights
+                        )
+                        damage_sum = -math.log(stouffer[1])
+                        if damage_sum:
+                            genon_vratio = damage_sum / (damage_sum + genon_sum)
+                        else:
+                            genon_vratio = 0
 
                         # write to result
                         R.genon_sum[gene][mode][hpo] = genon_sum
-                        R.genon_ratio[gene][mode][hpo] = genon_ratio
-                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_ratio
+                        R.genon_hratio[gene][mode][hpo] = genon_hratio
+                        R.genon_sratio[gene][mode][hpo] = genon_sratio
+                        R.genon_vratio[gene][mode][hpo] = genon_vratio
+                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_hratio
 
-                    for tp in ('genon_sum','genon_ratio','genon_combined'):
+                    for tp in ('genon_sum','genon_hratio','genon_vratio','genon_sratio','genon_combined',):
                         getattr(rr,tp)[gene][mode][hpo] = \
                                 getattr(R,tp)[gene][mode][hpo]
 
@@ -747,8 +847,10 @@ class Genon:
             if not self.genes[gene].hpos:
                 ps, ns = self.get_positive_negative_hpos(
                         rr.genon_sum[gene],
-                        rr.genon_ratio[gene],
-                        rr.genon_combined[gene]
+                        rr.genon_hratio[gene],
+                        rr.genon_vratio[gene],
+                        rr.genon_sratio[gene],
+                        rr.genon_combined[gene],
                         )
                 # remove ns
                 # note that ns is minised, so need to use ps to remove
@@ -758,16 +860,20 @@ class Genon:
                         if hpo not in ps[mode]:
                             for tp in (
                                     'genon_sum',
-                                    'genon_ratio',
-                                    'genon_combined'
+                                    'genon_hratio',
+                                    'genon_vratio',
+                                    'genon_sratio',
+                                    'genon_combined',
                                     ):
                                 getattr(rr,tp)[gene][mode].pop(hpo)
 
             # predict inheritance mode
             rr.predicted_mode[gene] = self.predict_mode(
                     rr.genon_sum[gene],
-                    rr.genon_ratio[gene],
-                    rr.genon_combined[gene]
+                    rr.genon_hratio[gene],
+                    rr.genon_vratio[gene],
+                    rr.genon_sratio[gene],
+                    rr.genon_combined[gene],
                     )
 
         return rr
