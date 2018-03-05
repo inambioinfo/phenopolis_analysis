@@ -793,9 +793,9 @@ class Genon:
                                 getattr(rr,tp)[gene][mode][hpo] = 0
                             continue
 
-                        # how about contribution from all?
+                        # how about contribution from non_rare variants?
                         weights, pvals = [],[]
-                        for ind,i in enumerate(genon):
+                        for ind,i in enumerate(genon[:,1:]):
                             for j in i:
                                 if not np.isnan(j):
                                     weights.append(
@@ -803,12 +803,15 @@ class Genon:
                                             self.stouffer_weights[ind]
                                     )
                                     pvals.append(j)
-                        stouffer = combine_pvalues(
-                                pvalues = pvals,
-                                method = self.combine_pvalues_method,
-                                weights = weights
-                        )
-                        S = -math.log(stouffer[1] or sys.float_info.epsilon)
+                        if len(pvals):
+                            stouffer = combine_pvalues(
+                                    pvalues = pvals,
+                                    method = self.combine_pvalues_method,
+                                    weights = weights
+                            )
+                            S = -math.log(stouffer[1] or sys.float_info.epsilon)
+                        else:
+                            S = 0
                         genon_hratio = genon_sum / (genon_sum + S)
                         # signal ratio
                         #rare = genon[:,0][~np.isnan(genon[:,0])]
@@ -832,10 +835,25 @@ class Genon:
 
                         # what proportion of contribution from damaging variants?
                         # only calculate for rare variants
-                        ind = (self.damage_cadd - self.crange[0]) // self.steps[0]
-                        damage_arr = genon[ind:,0]
+                        damage_ind = (self.damage_cadd - self.crange[0]) // self.steps[0]
+                        damage_arr = original_genon[damage_ind:,0]
                         weights,pvals = [],[]
                         for ind,val in enumerate(damage_arr):
+                            if not np.isnan(val):
+                                weights.append(
+                                        #ind * self.stouffer_weight_slope + 0.5
+                                        self.stouffer_weights[damage_ind + ind]
+                                )
+                                pvals.append(val)
+                        stouffer = combine_pvalues(
+                                pvalues = pvals,
+                                method = 'fisher',#self.combine_pvalues_method,
+                                weights = weights
+                        )
+                        damage_sum = -math.log(stouffer[1])
+                        non_damage_arr = original_genon[:damage_ind,0]
+                        weights,pvals = [],[]
+                        for ind,val in enumerate(non_damage_arr):
                             if not np.isnan(val):
                                 weights.append(
                                         #ind * self.stouffer_weight_slope + 0.5
@@ -844,12 +862,12 @@ class Genon:
                                 pvals.append(val)
                         stouffer = combine_pvalues(
                                 pvalues = pvals,
-                                method = self.combine_pvalues_method,
+                                method = 'fisher', #self.combine_pvalues_method,
                                 weights = weights
                         )
-                        damage_sum = -math.log(stouffer[1])
+                        non_damage_sum = -math.log(stouffer[1])
                         if damage_sum:
-                            genon_vratio = damage_sum / (damage_sum + genon_sum)
+                            genon_vratio = damage_sum / (damage_sum + non_damage_sum)
                         else:
                             genon_vratio = 0
 
