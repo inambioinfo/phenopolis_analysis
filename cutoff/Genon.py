@@ -20,6 +20,7 @@ import tabix
 import re
 import functools
 import utils
+import warnings
 #import itertools
 #insample_cutoff = 3
 np.seterr(divide='raise')
@@ -407,14 +408,14 @@ class Genon:
         self.second_cadd_min = 100
         # how to combine p values. fisher or stouffer.
         # stouffer can add weights
-        self.combine_pvalues_method = 'stouffer'
+        self.combine_pvalues_method = 'scaled_stouffer'
         # stouffer's weight slope
-        self.stouffer_weight_slope = 0.5
+        self.stouffer_weights = [0.1, 0.5, 0.75, 1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8]
         # only analyse hpo with N >= {N}
         # if no phase data is available, one can set gap to 100,
         # to treat close-by variants as cis
         self.gap = 0
-        self.N = 100
+        self.N = 60
         # the following hpos will not be analysed
         # they are inheritance modes that we do not know
         self.hpo_mask = ['HP:0000007','HP:0000006','HP:0003745','HP:0000005','HP:0012823','HP:0003674']
@@ -747,11 +748,16 @@ class Genon:
                             cadd_ind = self.second_cadd_min // self.steps[0]
                             genon[cadd_ind:,:] *= 1.5
 
-                        if self.combine_pvalues_method == 'stouffer':
+                        original_genon = genon.copy()
+                        if self.combine_pvalues_method in ('stouffer', 'scaled_stouffer'):
                             # convert all genon > 0.5 to 0.5 to stablise stouffer's
                             # performance
                             # not needed if using fisher
-                            genon[genon > 0.5] = 0.5
+
+                            # disable warning since there is NaN comparison
+                            with warnings.catch_warnings():
+                                warnings.simplefilter("ignore")
+                                genon[genon > 0.5] = 0.5
 
                         # use stouffer or fisher method to combine p values, 
                         # with weights for different cadd
@@ -760,16 +766,17 @@ class Genon:
                         for ind,val in enumerate(genon[:,0]):
                             if not np.isnan(val):
                                 weights.append(
-                                        ind * self.stouffer_weight_slope + 0.5
+                                        #ind * self.stouffer_weight_slope + 0.5
+                                        self.stouffer_weights[ind]
                                 )
                                 pvals.append(val)
                         if len(pvals):
-                            combine_test = stats.combine_pvalues(
+                            combine_test = combine_pvalues(
                                     pvalues = pvals,
                                     method = self.combine_pvalues_method,
                                     weights = weights
                             )
-                            genon_sum =  -math.log(combine_test[1])
+                            genon_sum =  -math.log(combine_test[1] or sys.float_info.epsilon)
                         else:
                             genon_sum = 0
 
@@ -792,23 +799,36 @@ class Genon:
                             for j in i:
                                 if not np.isnan(j):
                                     weights.append(
-                                            ind * self.stouffer_weight_slope + 0.5
+                                            #ind * self.stouffer_weight_slope + 0.5
+                                            self.stouffer_weights[ind]
                                     )
                                     pvals.append(j)
-                        stouffer = stats.combine_pvalues(
+                        stouffer = combine_pvalues(
                                 pvalues = pvals,
                                 method = self.combine_pvalues_method,
                                 weights = weights
                         )
-                        S = -math.log(stouffer[1])
+                        S = -math.log(stouffer[1] or sys.float_info.epsilon)
                         genon_hratio = genon_sum / (genon_sum + S)
                         # signal ratio
-                        rare = genon[:,0][~np.isnan(genon[:,0])]
-                        numerator = len(rare[ rare < 1 ])
-                        al = genon[~np.isnan(genon)]
+                        #rare = genon[:,0][~np.isnan(genon[:,0])]
+                        #numerator = len(rare[ rare < 1 ])
+                        #al = genon[~np.isnan(genon)]
+                        log_transform = lambda x:x if np.isnan(x) else -math.log(x)
+                        log_transform = np.vectorize(log_transform)
+                        rare = original_genon[:,0][~np.isnan(original_genon[:,0])]
+                        log_rare = sum(log_transform(rare))# / len(rare)
+                        rest = original_genon[:,1:][~np.isnan(original_genon[:,1:])]
+                        if log_rare == 0:
+                            gene_sratio = 0
+                        elif len(rest):
+                            log_rest = sum(log_transform(rest))# / len(rest)
+                            genon_sratio = log_rare / (log_rare+log_rest)
+                        else:
+                            genon_sratio = 1.
 
-                        denominator = len(al[al<1])
-                        genon_sratio = numerator / denominator
+                        #denominator = len(al[al<1])
+                        #genon_sratio = numerator / denominator
 
                         # what proportion of contribution from damaging variants?
                         # only calculate for rare variants
@@ -818,10 +838,11 @@ class Genon:
                         for ind,val in enumerate(damage_arr):
                             if not np.isnan(val):
                                 weights.append(
-                                        ind * self.stouffer_weight_slope + 0.5
+                                        #ind * self.stouffer_weight_slope + 0.5
+                                        self.stouffer_weights[ind]
                                 )
                                 pvals.append(val)
-                        stouffer = stats.combine_pvalues(
+                        stouffer = combine_pvalues(
                                 pvalues = pvals,
                                 method = self.combine_pvalues_method,
                                 weights = weights
@@ -837,7 +858,7 @@ class Genon:
                         R.genon_hratio[gene][mode][hpo] = genon_hratio
                         R.genon_sratio[gene][mode][hpo] = genon_sratio
                         R.genon_vratio[gene][mode][hpo] = genon_vratio
-                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_hratio
+                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_sratio
 
                     for tp in ('genon_sum','genon_hratio','genon_vratio','genon_sratio','genon_combined',):
                         getattr(rr,tp)[gene][mode][hpo] = \
@@ -877,6 +898,41 @@ class Genon:
                     )
 
         return rr
+
+def combine_pvalues(pvalues, method='fisher', weights=None):
+    '''
+    a copy of scipy.stats method,
+    but added a stouffer method with customised scale
+    '''
+    pvalues = np.asarray(pvalues)
+    if pvalues.ndim != 1:
+        raise ValueError("pvalues is not 1-D")
+
+    if method == 'fisher':
+        Xsq = -2 * np.sum(np.log(pvalues))
+        pval = stats.distributions.chi2.sf(Xsq, 2 * len(pvalues))
+        return (Xsq, pval)
+    elif method in ('stouffer', 'scaled_stouffer'):
+        if weights is None:
+            weights = np.ones_like(pvalues)
+        elif len(weights) != len(pvalues):
+            raise ValueError("pvalues and weights must be of the same size.")
+
+        weights = np.asarray(weights)
+        if weights.ndim != 1:
+            raise ValueError("weights is not 1-D")
+
+        Zi = stats.distributions.norm.isf(pvalues)
+        if method == 'stouffer':
+            Z = np.dot(weights, Zi) / np.linalg.norm(weights)
+        else:
+            Z = np.dot(weights, Zi) / math.sqrt(len(weights))
+        pval = stats.distributions.norm.sf(Z)
+
+        return (Z, pval)
+    else:
+        raise ValueError(
+            "Invalid method '%s'. Options are 'fisher', 'stouffer' or 'scaled_stouffer", method)
 
 if __name__ == '__main__':
     G = Genon()
