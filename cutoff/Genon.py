@@ -791,6 +791,7 @@ class Genon:
 
                             for tp in ('genon_sum','genon_sratio','genon_hratio','genon_vratio','genon_combined',):
                                 getattr(rr,tp)[gene][mode][hpo] = 0
+
                             continue
 
                         # how about contribution from non_rare variants?
@@ -823,7 +824,7 @@ class Genon:
                         log_rare = sum(log_transform(rare))# / len(rare)
                         rest = original_genon[:,1:][~np.isnan(original_genon[:,1:])]
                         if log_rare == 0:
-                            gene_sratio = 0
+                            genon_sratio = 0
                         elif len(rest):
                             log_rest = sum(log_transform(rest))# / len(rest)
                             genon_sratio = log_rare / (log_rare+log_rest)
