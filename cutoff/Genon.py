@@ -303,6 +303,7 @@ class GenonResult:
         self.genon_vratio = defaultdict(lambda: defaultdict(dict))
         self.genon_combined = defaultdict(lambda: defaultdict(dict))
         self.genon_sratio = defaultdict(lambda: defaultdict(dict))
+        self.ph = defaultdict(lambda: defaultdict(list))
         self.genes = None
         self.predicted_mode = dict()
 
@@ -350,6 +351,9 @@ class GenonResult:
                     getattr(self,self.sort_key)[gene][mode].items(), 
                     key = lambda x :x[1],
                     reverse = True):
+                # only show positive hpos
+                if self.genes[gene].hpos is None and hpo not in self.ph[gene][mode]:
+                    continue
                 s += '\t{}\n'.format(hpo)
                 s += '\t\tGenon_sum: {}\n'.format(Sum)
                 s += '\t\tGenon_hratio: {}\n'.format(
@@ -622,7 +626,16 @@ class Genon:
         # get raw p_a and p_h
         vcf_patients = set(list(gene.vcf))
         raw_p_a = vcf_patients & set(self.patient_info.keys())
-        raw_p_h = set([kk for kk,vv in self.patient_info.items() if hpo in vv and kk in vcf_patients])
+        # is hpo a string or list?
+        if isinstance(hpo, str):
+            raw_p_h = set([kk for kk,vv in self.patient_info.items() if hpo in vv and kk in vcf_patients])
+        else:
+            for kk,vv in self.patient_info.items():
+                if hpo[0] in vv and hpo[1] in vv:
+                    #print(kk,vv)
+                    pass
+            raw_p_h = set([kk for kk,vv in self.patient_info.items() if not (set(hpo) - set(vv)) and kk in vcf_patients])
+            print(raw_p_h)
         # make a np matrix
         shape1,shape2 = [],[]
         for k in patient_map:
@@ -694,7 +707,7 @@ class Genon:
             ns[mode] = self.trim_ns(ns[mode],ps[mode])
         return ps,ns
 
-    def predict_mode(self,gs,hr,vr,sr,gc):
+    def predict_mode(self,gs,hr,vr,sr,gc,ph):
         '''
         predict inheritance mode
         return a number. 
@@ -703,7 +716,7 @@ class Genon:
         '''
         vals = {'r':0,'d':0}
         for mode in ('r','d'):
-            vals[mode] = max(gc[mode].values() or [0])
+            vals[mode] = max([v for k,v in gc[mode].items() if k in ph[mode]] or [0])
         return vals['r'] - vals['d']
 
     def analyse(self, R, patient_maps = None):
@@ -895,6 +908,7 @@ class Genon:
                 # remove ns
                 # note that ns is minised, so need to use ps to remove
                 # any unwanted hpos
+                rr.ph[gene] = ps
                 for mode in ('d','r'):
                     for hpo in hpos:
                         if hpo not in ps[mode]:
@@ -905,7 +919,9 @@ class Genon:
                                     'genon_sratio',
                                     'genon_combined',
                                     ):
-                                getattr(rr,tp)[gene][mode].pop(hpo)
+                                # do not pop. refer to self.ph for positive hpos
+                                pass
+                                #getattr(rr,tp)[gene][mode].pop(hpo)
 
             # predict inheritance mode
             rr.predicted_mode[gene] = self.predict_mode(
@@ -914,6 +930,7 @@ class Genon:
                     rr.genon_vratio[gene],
                     rr.genon_sratio[gene],
                     rr.genon_combined[gene],
+                    rr.ph[gene],
                     )
 
         return rr
