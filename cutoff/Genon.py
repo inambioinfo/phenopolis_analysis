@@ -752,14 +752,6 @@ class Genon:
                                 patient_map,
                                 hpo
                                 )
-                        # reward high cadd based on second_cadd_min
-                        # second_cadd_min already rewards recessive by *2
-                        # if both variants are above second_cadd_min
-                        # dominant * 1.5
-                        # this is not needed any longer
-                        if mode == 'd':
-                            cadd_ind = self.second_cadd_min // self.steps[0]
-                            genon[cadd_ind:,:] *= 1.5
 
                         original_genon = genon.copy()
                         if self.combine_pvalues_method in ('stouffer', 'scaled_stouffer'):
