@@ -18,17 +18,13 @@ SCN1A - Given mode is d
       - Number of patients with rare variants: 100
       - HPOs are given...
 	HP:0001250
-		Genon_sum: 64.4263097926
-		Genon_hratio: 0.985077677075
-		Genon_vratio: 0.992700643978
-		Genon_sratio: 0.930102522342
-		Genon_combined: 59.9230732433
+		HGF: 64.4263097926
+		cadd_15_ratio: 0.992700643978
+		MOI_score: 59.9230732433
 	HP:0000707
-		Genon_sum: 28.319483674
-		Genon_hratio: 0.927743170062
-		Genon_vratio: 0.896760844442
-		Genon_sratio: 0.734355582504
-		Genon_combined: 20.7965709296
+		HGF: 28.319483674
+		cadd_15_ratio: 0.896760844442
+		MOI_score: 20.7965709296
 ...
 ```
 2. When you just want to know: given a gene, what phenotypes and mode of inheritance are assocated with it?
@@ -49,10 +45,8 @@ SCN1A - Predicted mode is d
       - Number of patients for mode r: 13
       - HPOs are predicted...
 	HP:0001250
-		Genon_sum: 64.4263097926
-		Genon_hratio: 0.985077677075
-		Genon_vratio: 0.992700643978
-		Genon_sratio: 0.930102522342
-		Genon_combined: 59.9230732433
+		HGF: 64.4263097926
+		cadd_15_ratio: 0.992700643978
+		MOI_score: 59.9230732433
 ...
 ```

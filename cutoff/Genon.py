@@ -293,22 +293,22 @@ class GeneBase:
 
 class GenonResult:
     '''
-    has genon_sums and genon_ratios
-    predicted_mode: recessive if positive, dominant if negative.
+    has HGFs and genon_ratios
+    predicted_moi: recessive if positive, dominant if negative.
     The bigger the margin the more confidence in the call
     '''
     def __init__(self):
-        self.genon_sum = defaultdict(lambda: defaultdict(dict))
+        self.HGF = defaultdict(lambda: defaultdict(dict))
         self.genon_hratio = defaultdict(lambda: defaultdict(dict))
-        self.genon_vratio = defaultdict(lambda: defaultdict(dict))
-        self.genon_combined = defaultdict(lambda: defaultdict(dict))
+        self.cadd_15_ratio = defaultdict(lambda: defaultdict(dict))
+        self.MOI_score = defaultdict(lambda: defaultdict(dict))
         self.genon_sratio = defaultdict(lambda: defaultdict(dict))
         self.ph = defaultdict(lambda: defaultdict(list))
         self.genes = None
-        self.predicted_mode = dict()
+        self.predicted_moi = dict()
 
         # for representing obj, sorting hpos
-        self.sort_key = 'genon_sum'
+        self.sort_key = 'HGF'
 
         # number of patients with 'rare' variants under different modes
         self.np = defaultdict(dict)
@@ -325,7 +325,7 @@ class GenonResult:
                         self.np[gene][mode]
                         )
             else:
-                mode_digit = self.predicted_mode[gene]
+                mode_digit = self.predicted_moi[gene]
                 if mode_digit > 0:
                     mode = 'r'
                 elif mode_digit < 0:
@@ -355,19 +355,21 @@ class GenonResult:
                 if self.genes[gene].hpos is None and hpo not in self.ph[gene][mode]:
                     continue
                 s += '\t{}\n'.format(hpo)
-                s += '\t\tGenon_sum: {}\n'.format(Sum)
+                s += '\t\tHGF: {}\n'.format(Sum)
+                s += '\t\tcadd_15_ratio: {}\n'.format(
+                        self.cadd_15_ratio[gene][mode][hpo]
+                        )
+                s += '\t\tMOI_score: {}\n'.format(
+                        self.MOI_score[gene][mode][hpo]
+                        )
+                '''
                 s += '\t\tGenon_hratio: {}\n'.format(
                         self.genon_hratio[gene][mode][hpo]
-                        )
-                s += '\t\tGenon_vratio: {}\n'.format(
-                        self.genon_vratio[gene][mode][hpo]
                         )
                 s += '\t\tGenon_sratio: {}\n'.format(
                         self.genon_sratio[gene][mode][hpo]
                         )
-                s += '\t\tGenon_combined: {}\n'.format(
-                        self.genon_combined[gene][mode][hpo]
-                        )
+                '''
         return s
                 
 
@@ -684,7 +686,7 @@ class Genon:
                 result.append(hn)
         return result
 
-    def get_positive_negative_hpos(self,genon_sum,genon_hratio,genon_vratio,genon_sratio,genon_combined,):
+    def get_positive_negative_hpos(self,HGF,genon_hratio,cadd_15_ratio,genon_sratio,MOI_score,):
         '''
         Get positive and negative hpo sets.
         Default method
@@ -693,10 +695,10 @@ class Genon:
 
         # get positive hpos and negative hpos
         for mode in ('r','d'):
-            cutf = np.mean(genon_sum[mode].values()) + \
+            cutf = np.mean(HGF[mode].values()) + \
                     self.coefficient * \
-                    np.std(genon_sum[mode].values())
-            for k,v in genon_sum[mode].items():
+                    np.std(HGF[mode].values())
+            for k,v in HGF[mode].items():
                 if v > cutf:
                     ps[mode].append(k)
                 elif v < cutf:
@@ -707,7 +709,7 @@ class Genon:
             ns[mode] = self.trim_ns(ns[mode],ps[mode])
         return ps,ns
 
-    def predict_mode(self,gs,hr,vr,sr,gc,ph):
+    def predict_moi(self,gs,hr,vr,sr,gc,ph):
         '''
         predict inheritance mode
         return a number. 
@@ -746,7 +748,7 @@ class Genon:
                         ))))
                 rr.np[gene][mode] = R.np[gene][mode]
                 for hpo in this_hpos:
-                    if hpo not in R.genon_sum[gene][mode]:
+                    if hpo not in R.HGF[gene][mode]:
                         genon = self.phenogenon(
                                 self.genes[gene],
                                 patient_map,
@@ -781,20 +783,20 @@ class Genon:
                                     method = self.combine_pvalues_method,
                                     weights = weights
                             )
-                            genon_sum =  -math.log(combine_test[1] or sys.float_info.epsilon)
+                            HGF =  -math.log(combine_test[1] or sys.float_info.epsilon)
                         else:
-                            genon_sum = 0
+                            HGF = 0
 
-                        if not genon_sum:
-                            # genon_sum is 0. return everything as 0
+                        if not HGF:
+                            # HGF is 0. return everything as 0
                             # write to result
-                            R.genon_sum[gene][mode][hpo] = 0
+                            R.HGF[gene][mode][hpo] = 0
                             R.genon_hratio[gene][mode][hpo] = 0
                             R.genon_sratio[gene][mode][hpo] = 0
-                            R.genon_vratio[gene][mode][hpo] = 0
-                            R.genon_combined[gene][mode][hpo] = 0
+                            R.cadd_15_ratio[gene][mode][hpo] = 0
+                            R.MOI_score[gene][mode][hpo] = 0
 
-                            for tp in ('genon_sum','genon_sratio','genon_hratio','genon_vratio','genon_combined',):
+                            for tp in ('HGF','genon_sratio','genon_hratio','cadd_15_ratio','MOI_score',):
                                 getattr(rr,tp)[gene][mode][hpo] = 0
 
                             continue
@@ -818,7 +820,7 @@ class Genon:
                             S = -math.log(stouffer[1] or sys.float_info.epsilon)
                         else:
                             S = 0
-                        genon_hratio = genon_sum / (genon_sum + S)
+                        genon_hratio = HGF / (HGF + S)
                         # signal ratio
                         #rare = genon[:,0][~np.isnan(genon[:,0])]
                         #numerator = len(rare[ rare < 1 ])
@@ -873,29 +875,29 @@ class Genon:
                         )
                         non_damage_sum = -math.log(stouffer[1])
                         if damage_sum:
-                            genon_vratio = damage_sum / (damage_sum + non_damage_sum)
+                            cadd_15_ratio = damage_sum / (damage_sum + non_damage_sum)
                         else:
-                            genon_vratio = 0
+                            cadd_15_ratio = 0
 
                         # write to result
-                        R.genon_sum[gene][mode][hpo] = genon_sum
+                        R.HGF[gene][mode][hpo] = HGF
                         R.genon_hratio[gene][mode][hpo] = genon_hratio
                         R.genon_sratio[gene][mode][hpo] = genon_sratio
-                        R.genon_vratio[gene][mode][hpo] = genon_vratio
-                        R.genon_combined[gene][mode][hpo] = genon_sum * genon_sratio
+                        R.cadd_15_ratio[gene][mode][hpo] = cadd_15_ratio
+                        R.MOI_score[gene][mode][hpo] = HGF * genon_sratio
 
-                    for tp in ('genon_sum','genon_hratio','genon_vratio','genon_sratio','genon_combined',):
+                    for tp in ('HGF','genon_hratio','cadd_15_ratio','genon_sratio','MOI_score',):
                         getattr(rr,tp)[gene][mode][hpo] = \
                                 getattr(R,tp)[gene][mode][hpo]
 
             # are hpos provided? if not, predict
             if not self.genes[gene].hpos:
                 ps, ns = self.get_positive_negative_hpos(
-                        rr.genon_sum[gene],
+                        rr.HGF[gene],
                         rr.genon_hratio[gene],
-                        rr.genon_vratio[gene],
+                        rr.cadd_15_ratio[gene],
                         rr.genon_sratio[gene],
-                        rr.genon_combined[gene],
+                        rr.MOI_score[gene],
                         )
                 # remove ns
                 # note that ns is minised, so need to use ps to remove
@@ -905,23 +907,23 @@ class Genon:
                     for hpo in hpos:
                         if hpo not in ps[mode]:
                             for tp in (
-                                    'genon_sum',
+                                    'HGF',
                                     'genon_hratio',
-                                    'genon_vratio',
+                                    'cadd_15_ratio',
                                     'genon_sratio',
-                                    'genon_combined',
+                                    'MOI_score',
                                     ):
                                 # do not pop. refer to self.ph for positive hpos
                                 pass
                                 #getattr(rr,tp)[gene][mode].pop(hpo)
 
             # predict inheritance mode
-            rr.predicted_mode[gene] = self.predict_mode(
-                    rr.genon_sum[gene],
+            rr.predicted_moi[gene] = self.predict_moi(
+                    rr.HGF[gene],
                     rr.genon_hratio[gene],
-                    rr.genon_vratio[gene],
+                    rr.cadd_15_ratio[gene],
                     rr.genon_sratio[gene],
-                    rr.genon_combined[gene],
+                    rr.MOI_score[gene],
                     rr.ph[gene],
                     )
 
