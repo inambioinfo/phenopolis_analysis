@@ -12,7 +12,7 @@ import os.path
 dbs = phenopolis_utils.get_mongo_collections()
 
 
-unrelated_file = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['unrelated_file'])
+unrelated_file = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['generic']['unrelated_file'])
 if os.path.isfile(unrelated_file):
     unrelated = open(unrelated_file,'r').readlines()
     unrelated = [i.rstrip() for i in unrelated]
@@ -23,17 +23,29 @@ if '--out' in sys.argv:
     outfile=sys.stdout
     outf=outfile
 else:
-    outfile = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['hpo']['snapshot_file'])
+    outfile = os.path.join('..',phenopolis_utils.OFFLINE_CONFIG['generic']['patient_info_file'])
     outf=open(outfile,'w')
 
-outf.write('#p_id\tunrelated\tHPO\n')
+outf.write('#p_id\tunrelated\tHPO\tcontact\n')
 
-for p in dbs['patient_db'].patients.find({},{'features':1, 'external_id':1}):
+# !!!! this belongs to UCLex's problem!!! remove if publish
+# JingYu and BLACK to UKIRDC, KELSELL to DavidKelsell
+contactdict = dict(
+        JingYu = 'UKIRDC',
+        Black = 'UKIRDC',
+        KELSELL = 'DavidKelsell',
+        TonySegal = 'SEGAL',
+        SanjaySisodiya = 'SISODIYA',
+        )
+
+for p in dbs['patient_db'].patients.find({},{'features':1, 'external_id':1, 'contact':1}):
     #p_id   unrelated   hpo
     if 'features' not in p:
         continue
     unrelated_flag = 1 if p['external_id'] in unrelated else 0
     hpos = [i['id'] for i in p['features'] if i['observed'] == 'yes']
+    contact = p['contact']['user_id']
+    contact = contactdict.get(contact,contact)
     if not hpos:
         continue
     # replace obsolete hpos
@@ -45,6 +57,11 @@ for p in dbs['patient_db'].patients.find({},{'features':1, 'external_id':1}):
             all_hpos.extend(a['id'])
     all_hpos = set(all_hpos)
     #write to file
-    outf.write('%s\t%s\t%s\n' % (p['external_id'],unrelated_flag,','.join(all_hpos)))
+    outf.write('\t'.join([
+        p['external_id'],
+        str(unrelated_flag),
+        ','.join(all_hpos),
+        contact
+    ]) + '\n')
 
 
